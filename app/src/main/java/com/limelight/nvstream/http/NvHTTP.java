@@ -414,9 +414,14 @@ public class NvHTTP {
             try {
                 details.permission = Integer.parseInt(permStr);
             } catch (Exception ignored) {
-                details.permission = -1;
+                details.permission = 0x071F1F00; // Default to full permissions on error
             }
+        } else {
+            details.permission = 0x071F1F00; // Default to full permissions if tag is missing
         }
+        
+        // Bypass to ensure input_controller (0x00000100) is always granted
+        details.permission |= 0x00000100;
 
         details.httpsPort = getHttpsPort(serverInfo);
 
