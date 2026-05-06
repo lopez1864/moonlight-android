@@ -332,9 +332,49 @@ public class StreamSettings extends AppCompatActivity {
             initializePreferences();
         }
 
-        public void initializePreferences() {
+       public void initializePreferences() {
             addPreferencesFromResource(R.xml.preferences);
             PreferenceScreen screen = getPreferenceScreen();
+
+            androidx.preference.Preference bindPref = findPreference("pref_bind_controller");
+            if (bindPref != null) {
+                bindPref.setOnPreferenceClickListener(new androidx.preference.Preference.OnPreferenceClickListener() {
+                    @Override
+                    public boolean onPreferenceClick(androidx.preference.Preference preference) {
+                        int targetXboxKeyCode = android.view.KeyEvent.KEYCODE_BUTTON_A;
+                        String buttonName = "Xbox Button A";
+                        
+                        androidx.appcompat.app.AlertDialog.Builder builder = new androidx.appcompat.app.AlertDialog.Builder(getActivity());
+                        builder.setTitle("Waiting for input...");
+                        builder.setMessage("Press the hardware button on your controller to map to " + buttonName);
+                        builder.setCancelable(false);
+                        builder.setNegativeButton("Cancel", (dialog, which) -> dialog.dismiss());
+
+                        androidx.appcompat.app.AlertDialog dialog = builder.create();
+
+                        dialog.setOnKeyListener((dialogInterface, rawKeyCode, event) -> {
+                            if (event.getAction() == android.view.KeyEvent.ACTION_DOWN) {
+                                if (rawKeyCode == android.view.KeyEvent.KEYCODE_BACK) {
+                                    dialogInterface.dismiss();
+                                    return true;
+                                }
+
+                                // Save the mapping into SharedPreferences
+                                android.content.SharedPreferences prefs = getActivity().getSharedPreferences("ControllerMappings", android.content.Context.MODE_PRIVATE);
+                                prefs.edit().putInt("MAP_" + rawKeyCode, targetXboxKeyCode).apply();
+
+                                android.widget.Toast.makeText(getActivity(), buttonName + " mapped successfully!", android.widget.Toast.LENGTH_SHORT).show();
+                                dialogInterface.dismiss();
+                                return true;
+                            }
+                            return false;
+                        });
+
+                        dialog.show();
+                        return true;
+                    }
+                });
+            }
 
             AppCompatActivity activity = (AppCompatActivity) requireActivity();
             PackageManager pm = activity.getPackageManager();
