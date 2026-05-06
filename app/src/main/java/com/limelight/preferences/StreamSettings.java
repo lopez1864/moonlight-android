@@ -336,46 +336,76 @@ public class StreamSettings extends AppCompatActivity {
             addPreferencesFromResource(R.xml.preferences);
             PreferenceScreen screen = getPreferenceScreen();
 
-            androidx.preference.Preference bindPref = findPreference("pref_bind_controller");
+           androidx.preference.Preference bindPref = findPreference("pref_bind_controller");
             if (bindPref != null) {
                 bindPref.setOnPreferenceClickListener(new androidx.preference.Preference.OnPreferenceClickListener() {
                     @Override
                     public boolean onPreferenceClick(androidx.preference.Preference preference) {
-                        int targetXboxKeyCode = android.view.KeyEvent.KEYCODE_BUTTON_A;
-                        String buttonName = "Xbox Button A";
+                        // The COMPLETE list of controller buttons
+                        final String[] buttonNames = {
+                            "Xbox Button A", "Xbox Button B", "Xbox Button X", "Xbox Button Y",
+                            "D-Pad Up", "D-Pad Down", "D-Pad Left", "D-Pad Right",
+                            "Left Bumper (L1)", "Right Bumper (R1)", 
+                            "Left Trigger Button (L2)", "Right Trigger Button (R2)",
+                            "Left Stick Click (L3)", "Right Stick Click (R3)", 
+                            "Start / Menu", "Select / View", "Xbox Guide / Home Button"
+                        };
                         
-                        androidx.appcompat.app.AlertDialog.Builder builder = new androidx.appcompat.app.AlertDialog.Builder(getActivity());
-                        builder.setTitle("Waiting for input...");
-                        builder.setMessage("Press the hardware button on your controller to map to " + buttonName);
-                        builder.setCancelable(false);
-                        builder.setNegativeButton("Cancel", (dialog, which) -> dialog.dismiss());
+                        // The matching standard Android keycodes
+                        final int[] targetKeyCodes = {
+                            android.view.KeyEvent.KEYCODE_BUTTON_A, android.view.KeyEvent.KEYCODE_BUTTON_B,
+                            android.view.KeyEvent.KEYCODE_BUTTON_X, android.view.KeyEvent.KEYCODE_BUTTON_Y,
+                            android.view.KeyEvent.KEYCODE_DPAD_UP, android.view.KeyEvent.KEYCODE_DPAD_DOWN,
+                            android.view.KeyEvent.KEYCODE_DPAD_LEFT, android.view.KeyEvent.KEYCODE_DPAD_RIGHT,
+                            android.view.KeyEvent.KEYCODE_BUTTON_L1, android.view.KeyEvent.KEYCODE_BUTTON_R1,
+                            android.view.KeyEvent.KEYCODE_BUTTON_L2, android.view.KeyEvent.KEYCODE_BUTTON_R2,
+                            android.view.KeyEvent.KEYCODE_BUTTON_THUMBL, android.view.KeyEvent.KEYCODE_BUTTON_THUMBR,
+                            android.view.KeyEvent.KEYCODE_BUTTON_START, android.view.KeyEvent.KEYCODE_BUTTON_SELECT,
+                            android.view.KeyEvent.KEYCODE_BUTTON_MODE
+                        };
 
-                        androidx.appcompat.app.AlertDialog dialog = builder.create();
+                        androidx.appcompat.app.AlertDialog.Builder menuBuilder = new androidx.appcompat.app.AlertDialog.Builder(getActivity());
+                        menuBuilder.setTitle("Select Button to Map");
+                        menuBuilder.setItems(buttonNames, (dialogInterface, which) -> {
+                            
+                            int targetXboxKeyCode = targetKeyCodes[which];
+                            String buttonName = buttonNames[which];
 
-                        dialog.setOnKeyListener((dialogInterface, rawKeyCode, event) -> {
-                            if (event.getAction() == android.view.KeyEvent.ACTION_DOWN) {
-                                if (rawKeyCode == android.view.KeyEvent.KEYCODE_BACK) {
-                                    dialogInterface.dismiss();
+                            androidx.appcompat.app.AlertDialog.Builder builder = new androidx.appcompat.app.AlertDialog.Builder(getActivity());
+                            builder.setTitle("Waiting for input...");
+                            builder.setMessage("Press the hardware button on your controller to map to " + buttonName);
+                            builder.setCancelable(false);
+                            builder.setNegativeButton("Cancel", (dialog, cancelWhich) -> dialog.dismiss());
+
+                            androidx.appcompat.app.AlertDialog dialog = builder.create();
+
+                            dialog.setOnKeyListener((dInterface, rawKeyCode, event) -> {
+                                if (event.getAction() == android.view.KeyEvent.ACTION_DOWN) {
+                                    if (rawKeyCode == android.view.KeyEvent.KEYCODE_BACK) {
+                                        dInterface.dismiss();
+                                        return true;
+                                    }
+
+                                    android.content.SharedPreferences prefs = getActivity().getSharedPreferences("ControllerMappings", android.content.Context.MODE_PRIVATE);
+                                    prefs.edit().putInt("MAP_" + rawKeyCode, targetXboxKeyCode).apply();
+
+                                    android.widget.Toast.makeText(getActivity(), buttonName + " mapped successfully!", android.widget.Toast.LENGTH_SHORT).show();
+                                    dInterface.dismiss();
                                     return true;
                                 }
+                                return false;
+                            });
 
-                                // Save the mapping into SharedPreferences
-                                android.content.SharedPreferences prefs = getActivity().getSharedPreferences("ControllerMappings", android.content.Context.MODE_PRIVATE);
-                                prefs.edit().putInt("MAP_" + rawKeyCode, targetXboxKeyCode).apply();
-
-                                android.widget.Toast.makeText(getActivity(), buttonName + " mapped successfully!", android.widget.Toast.LENGTH_SHORT).show();
-                                dialogInterface.dismiss();
-                                return true;
-                            }
-                            return false;
+                            dialog.show();
                         });
+                        
+                        menuBuilder.setNegativeButton("Cancel", null);
+                        menuBuilder.show();
 
-                        dialog.show();
                         return true;
                     }
                 });
             }
-
             AppCompatActivity activity = (AppCompatActivity) requireActivity();
             PackageManager pm = activity.getPackageManager();
 
