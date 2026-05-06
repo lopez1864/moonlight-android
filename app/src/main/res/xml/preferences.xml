@@ -243,6 +243,13 @@
         android:title="@string/category_gamepad_settings"
         app:initialExpandedChildrenCount="1"
         app:iconSpaceReserved="false">
+
+        <Preference
+            android:key="pref_bind_controller"
+            android:summary="Map a physical controller to virtual Xbox buttons"
+            android:title="Bind Controller Buttons"
+            app:iconSpaceReserved="false" />
+
         <com.limelight.preferences.SeekBarPreference
             android:defaultValue="5"
             android:key="seekbar_deadzone"
