@@ -141,7 +141,10 @@ public class Game extends AppCompatActivity implements SurfaceHolder.Callback,
         OnSystemUiVisibilityChangeListener, GameGestures, StreamContainer.InputCallbacks,
         ExternalControllerView.InputCallbacks,
         PerfOverlayListener, UsbDriverService.UsbDriverStateListener, View.OnKeyListener {
-    public static Game instance;
+   public static Game instance;
+
+    // Custom Controller Mapping
+    private java.util.HashMap<Integer, Integer> customKeyMap = new java.util.HashMap<>();
 
     private int lastButtonState = 0;
 
@@ -932,7 +935,21 @@ public class Game extends AppCompatActivity implements SurfaceHolder.Callback,
                 }
             }
         } catch (Throwable ignored) {}
-    }
+
+        // Load custom controller mappings from SharedPreferences into our HashMap
+        android.content.SharedPreferences prefs = getSharedPreferences("ControllerMappings", MODE_PRIVATE);
+        for (java.util.Map.Entry<String, ?> entry : prefs.getAll().entrySet()) {
+            if (entry.getKey().startsWith("MAP_") && entry.getValue() instanceof Integer) {
+                try {
+                    int rawKeyCode = Integer.parseInt(entry.getKey().substring(4));
+                    int mappedXboxKeyCode = (Integer) entry.getValue();
+                    customKeyMap.put(rawKeyCode, mappedXboxKeyCode);
+                } catch (NumberFormatException e) {
+                    // Ignore malformed keys
+                }
+            }
+        }
+    } // <-- This is the end of the onCreate method
 
     @SuppressLint("ClickableViewAccessibility")
     private void setupOverlayToggleButton() {
@@ -4333,7 +4350,7 @@ public class Game extends AppCompatActivity implements SurfaceHolder.Callback,
         }
     }
 
-    /** Helper ricorsivo per trovare la prima SurfaceView nel layout corrente */
+/** Helper ricorsivo per trovare la prima SurfaceView nel layout corrente */
     private SurfaceView findFirstSurfaceViewFrom(View v) {
         if (v instanceof SurfaceView) return (SurfaceView) v;
         if (v instanceof ViewGroup) {
@@ -4346,4 +4363,23 @@ public class Game extends AppCompatActivity implements SurfaceHolder.Callback,
         return null;
     }
 
+    @Override
+    public boolean dispatchKeyEvent(android.view.KeyEvent event) {
+        int rawKeyCode = event.getKeyCode();
+
+        // Check if the hardware press matches our binding HashMap
+        if (customKeyMap.containsKey(rawKeyCode)) {
+            int mappedXboxKeyCode = customKeyMap.get(rawKeyCode);
+
+            // Mutate the event into the Xbox equivalent
+            android.view.KeyEvent mutatedEvent = new android.view.KeyEvent(
+                    event.getDownTime(), event.getEventTime(), event.getAction(),
+                    mappedXboxKeyCode, event.getRepeatCount(), event.getMetaState(),
+                    event.getDeviceId(), event.getScanCode(), event.getFlags(), event.getSource()
+            );
+
+            return super.dispatchKeyEvent(mutatedEvent);
+        }
+        return super.dispatchKeyEvent(event);
+    }
 }
