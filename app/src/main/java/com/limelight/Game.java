@@ -4463,6 +4463,106 @@ public class Game extends AppCompatActivity implements SurfaceHolder.Callback,
         return super.dispatchGenericMotionEvent(event);
     }
 
+// ==============================================================================
+    // PCSX2 RADIAL MATH ENGINE (Extracted by AI Agent)
+    // ==============================================================================
+    private float[] applyRadialDeadzoneAndScale(float rawX, float rawY, float deadzone, float scale) {
+        if (rawX == 0f && rawY == 0f) {
+            return new float[]{0f, 0f};
+        }
+        float magnitude = (float) Math.hypot(rawX, rawY);
+        if (magnitude <= deadzone) {
+            return new float[]{0f, 0f};
+        }
+        float normalizedMagnitude = (magnitude - deadzone) / (1.0f - deadzone);
+        float scaledMagnitude = Math.min(1.0f, normalizedMagnitude * scale);
+        
+        return new float[]{
+            (rawX / magnitude) * scaledMagnitude,
+            (rawY / magnitude) * scaledMagnitude
+        };
+    }
+
+    // ==============================================================================
+    // V2 ANALOG INTERCEPTOR (Joysticks & Triggers)
+    // ==============================================================================
+    @Override
+    public boolean dispatchGenericMotionEvent(android.view.MotionEvent event) {
+        // Only intercept if the event is a MOVE action
+        if (event.getActionMasked() == android.view.MotionEvent.ACTION_MOVE) {
+
+            int pointerCount = event.getPointerCount();
+            android.view.MotionEvent.PointerProperties[] properties = new android.view.MotionEvent.PointerProperties[pointerCount];
+            android.view.MotionEvent.PointerCoords[] coords = new android.view.MotionEvent.PointerCoords[pointerCount];
+
+            for (int i = 0; i < pointerCount; i++) {
+                properties[i] = new android.view.MotionEvent.PointerProperties();
+                event.getPointerProperties(i, properties[i]);
+
+                coords[i] = new android.view.MotionEvent.PointerCoords();
+                event.getPointerCoords(i, coords[i]);
+                
+                // Extract Axes
+                float rawLx = coords[i].getAxisValue(android.view.MotionEvent.AXIS_X);
+                float rawLy = coords[i].getAxisValue(android.view.MotionEvent.AXIS_Y);
+                float rawRx = coords[i].getAxisValue(android.view.MotionEvent.AXIS_Z);
+                float rawRy = coords[i].getAxisValue(android.view.MotionEvent.AXIS_RZ);
+
+                float hatX = coords[i].getAxisValue(android.view.MotionEvent.AXIS_HAT_X);
+                float hatY = coords[i].getAxisValue(android.view.MotionEvent.AXIS_HAT_Y);
+                float lTrigger = coords[i].getAxisValue(android.view.MotionEvent.AXIS_LTRIGGER);
+                float rTrigger = coords[i].getAxisValue(android.view.MotionEvent.AXIS_RTRIGGER);
+
+                // Apply the PCSX2 Math: 0.20f deadzone, 1.0f scale
+                float[] processedLeft = applyRadialDeadzoneAndScale(rawLx, rawLy, 0.20f, 1.0f);
+                float[] processedRight = applyRadialDeadzoneAndScale(rawRx, rawRy, 0.20f, 1.0f);
+
+                // Update the Mutated Event: Inject mathematically-perfect values
+                coords[i].setAxisValue(android.view.MotionEvent.AXIS_X, processedLeft[0]);
+                coords[i].setAxisValue(android.view.MotionEvent.AXIS_Y, processedLeft[1]);
+                coords[i].setAxisValue(android.view.MotionEvent.AXIS_Z, processedRight[0]);
+                coords[i].setAxisValue(android.view.MotionEvent.AXIS_RZ, processedRight[1]);
+
+                // Preserve Hat and Trigger states
+                coords[i].setAxisValue(android.view.MotionEvent.AXIS_HAT_X, hatX);
+                coords[i].setAxisValue(android.view.MotionEvent.AXIS_HAT_Y, hatY);
+                coords[i].setAxisValue(android.view.MotionEvent.AXIS_LTRIGGER, lTrigger);
+                coords[i].setAxisValue(android.view.MotionEvent.AXIS_RTRIGGER, rTrigger);
+            }
+
+            // CRITICAL OVERRIDE: Force DeviceID to -2 (Virtual Controller)
+            android.view.MotionEvent mutatedEvent = android.view.MotionEvent.obtain(
+                    event.getDownTime(),
+                    event.getEventTime(),
+                    event.getAction(),
+                    pointerCount,
+                    properties,
+                    coords,
+                    event.getMetaState(),
+                    event.getButtonState(),
+                    event.getXPrecision(),
+                    event.getYPrecision(),
+                    -2, // <-- THIS IS THE MAGIC FIX
+                    event.getEdgeFlags(),
+                    android.view.InputDevice.SOURCE_GAMEPAD, 
+                    event.getFlags()
+            );
+
+            // Pass to Engine
+            if (controllerHandler != null) {
+                controllerHandler.handleMotionEvent(mutatedEvent);
+            }
+
+            // Memory Management
+            mutatedEvent.recycle();
+
+            return true; // Event consumed and handled
+        }
+
+        // Fallback to default dispatching for non-move events
+        return super.dispatchGenericMotionEvent(event);
+    }
+
     // ==============================================================================
     // V2 DIGITAL INTERCEPTOR (Watch Dogs Fix)
     // ==============================================================================
@@ -4474,15 +4574,16 @@ public class Game extends AppCompatActivity implements SurfaceHolder.Callback,
         if (customKeyMap.containsKey(rawKeyCode)) {
             int mappedXboxKeyCode = customKeyMap.get(rawKeyCode);
 
-            // Force the event to be a Gamepad event, stripping away the "Keyboard" label
+            // CRITICAL OVERRIDE: Force DeviceID to -2 (Virtual Controller)
             android.view.KeyEvent mutatedEvent = new android.view.KeyEvent(
                     event.getDownTime(), event.getEventTime(), event.getAction(),
                     mappedXboxKeyCode, event.getRepeatCount(), event.getMetaState(),
-                    event.getDeviceId(), event.getScanCode(), event.getFlags(),
+                    -2, // <-- THIS IS THE MAGIC FIX
+                    event.getScanCode(), event.getFlags(),
                     android.view.InputDevice.SOURCE_GAMEPAD
             );
 
-            // Inject it directly into the streaming engine, completely bypassing Android's OS checks
+            // Inject it directly into the streaming engine
             if (controllerHandler != null) {
                 if (event.getAction() == android.view.KeyEvent.ACTION_DOWN) {
                     controllerHandler.handleButtonDown(mutatedEvent);
